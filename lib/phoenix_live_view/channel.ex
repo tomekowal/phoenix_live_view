@@ -84,6 +84,7 @@ defmodule Phoenix.LiveView.Channel do
 
   def handle_info(%Message{topic: topic, event: "event"} = msg, %{topic: topic} = state) do
     %{"value" => raw_val, "event" => event, "type" => type} = msg.payload
+    IO.inspect state.clock, label: "server clock"
     val = decode_event_type(type, raw_val)
 
     if cid = msg.payload["cid"] do
@@ -420,12 +421,14 @@ defmodule Phoenix.LiveView.Channel do
 
         {:noreply,
          new_state
+         |> increment_clock
          |> push_live_patch(pending_live_patch)
          |> push_render(diff, ref)}
 
       :noop ->
         {:noreply,
          new_state
+         |> increment_clock
          |> push_live_patch(pending_live_patch)
          |> push_noop(ref)}
 
@@ -547,15 +550,19 @@ defmodule Phoenix.LiveView.Channel do
 
   defp reply(state, ref, status, payload) do
     reply_ref = {state.transport_pid, state.serializer, state.topic, ref, state.join_ref}
+    payload = add_clock_to_payload(payload, state.clock)
     Phoenix.Channel.reply(reply_ref, {status, payload})
     state
   end
 
   defp push(state, event, payload) do
+    payload = add_clock_to_payload(payload, state.clock)
     message = %Message{topic: state.topic, event: event, payload: payload}
     send(state.transport_pid, state.serializer.encode!(message))
     state
   end
+
+  defp add_clock_to_payload(payload, clock), do: Map.put(payload, "c", clock)
 
   ## Mount
 
@@ -758,7 +765,8 @@ defmodule Phoenix.LiveView.Channel do
       socket: lv_socket,
       topic: phx_socket.topic,
       transport_pid: phx_socket.transport_pid,
-      components: Diff.new_components()
+      components: Diff.new_components(),
+      clock: 0
     }
   end
 
@@ -773,4 +781,6 @@ defmodule Phoenix.LiveView.Channel do
   defp assign_action(socket, action) do
     Phoenix.LiveView.assign(socket, :live_action, action)
   end
+
+  defp increment_clock(%{clock: clock} = state), do: %{state | clock: clock + 1}
 end

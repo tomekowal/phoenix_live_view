@@ -1509,6 +1509,7 @@ export class View {
     this.id = this.el.id
     this.view = this.el.getAttribute(PHX_VIEW)
     this.ref = 0
+    this.clock = 0
     this.childJoins = 0
     this.loaderTimer = null
     this.pendingDiffs = []
@@ -1918,8 +1919,10 @@ export class View {
   onChannel(event, cb){
     this.liveSocket.onChannel(this.channel, event, resp => {
       if(this.isJoinPending()){
+        console.log(resp.c)
         this.root.pendingJoinOps.push([this, () => cb(resp)])
       } else {
+        console.log(resp.c)
         cb(resp)
       }
     })
@@ -2021,6 +2024,7 @@ export class View {
     }
 
     if(typeof(payload.cid) !== "number"){ delete payload.cid }
+    this.clock++
     return(
       this.liveSocket.wrapPush(() => {
         return this.channel.push(event, payload, PUSH_TIMEOUT).receive("ok", resp => {
